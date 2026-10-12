@@ -1,12 +1,13 @@
 import os
 import streamlit as st
 import tempfile
+# Menggunakan import terbaru sesuai dengan versi LangChain terkini (langchain-community)
 from langchain.chains import ConversationalRetrievalChain
-from langchain.chat_models import ChatOpenAI
-from langchain.document_loaders import PyPDFLoader
-from langchain.embeddings import OpenAIEmbeddings
+from langchain_community.chat_models import ChatOpenAI
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.embeddings import OpenAIEmbeddings
 from langchain.memory import ConversationBufferMemory
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 # ==========================================
@@ -14,12 +15,11 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 # ==========================================
 st.set_page_config(page_title="Peach of Cake CS", page_icon="🍑", layout="centered")
 
-# Menggunakan Streamlit Secrets untuk API Key agar aman saat di-deploy
-# Pastikan Anda telah mengatur 'OPENAI_API_KEY' di Streamlit Cloud Secrets (Settings -> Secrets)
+# Menggunakan Streamlit Secrets untuk API Key
 if "OPENAI_API_KEY" in st.secrets:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 else:
-    st.error("⚠️ OPENAI_API_KEY tidak ditemukan di Streamlit Secrets. Silakan tambahkan terlebih dahulu.")
+    st.error("⚠️ OPENAI_API_KEY tidak ditemukan di Streamlit Secrets.")
     st.stop()
 
 # ==========================================
@@ -27,18 +27,6 @@ else:
 # ==========================================
 @st.cache_resource(show_spinner="Memuat basis pengetahuan toko...")
 def init_vectorstore(pdf_file_path):
-    loader = PyPDFLoader(pdf_file_path)
-    documents = loader.load()
-    
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500, 
-        chunk_overlap=50
-    )
-    chunks = text_splitter.split_documents(documents)
-    
-    embeddings = OpenAIEmbeddings()
-    vectorstore = FAISS.from_documents(chunks, embeddings)
-    
     return vectorstore
 
 def init_chatbot(vectorstore):
@@ -69,7 +57,7 @@ with st.sidebar:
         st.session_state.messages = []
         if 'chatbot' in st.session_state:
             del st.session_state['chatbot']
-        st.experimental_rerun()
+        st.rerun()
 
 # Memeriksa apakah file sudah diunggah
 if uploaded_file is None:
@@ -78,7 +66,6 @@ if uploaded_file is None:
 
 # Memproses file yang diunggah
 if "vectorstore" not in st.session_state or st.session_state.get('uploaded_file_name') != uploaded_file.name:
-    # Simpan file sementara untuk dibaca oleh PyPDFLoader
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
         tmp_file.write(uploaded_file.getvalue())
         tmp_path = tmp_file.name
@@ -86,7 +73,6 @@ if "vectorstore" not in st.session_state or st.session_state.get('uploaded_file_
     with st.spinner("Memproses katalog Anda..."):
         st.session_state.vectorstore = init_vectorstore(tmp_path)
         st.session_state.uploaded_file_name = uploaded_file.name
-        # Hapus file sementara setelah selesai
         os.remove(tmp_path)
 
 # Inisialisasi state untuk chatbot dan riwayat pesan
@@ -105,12 +91,10 @@ for message in st.session_state.messages:
 
 # Input obrolan dari pengguna
 if prompt := st.chat_input("Tanyakan sesuatu tentang kue atau layanan kami..."):
-    # Tampilkan pesan pengguna di UI
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Dapatkan respon dari bot
     with st.chat_message("assistant"):
         with st.spinner("Sedang mengetik..."):
             try:
