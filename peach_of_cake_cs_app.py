@@ -1,25 +1,23 @@
 import os
 import streamlit as st
 import tempfile
-# Menggunakan import terbaru sesuai dengan versi LangChain terkini (langchain-community)
-from langchain.chains import ConversationalRetrievalChain
-from langchain_community.chat_models import ChatOpenAI
+from openai import OpenAI
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.embeddings import OpenAIEmbeddings
-from langchain.memory import ConversationBufferMemory
 from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 # ==========================================
 # KONFIGURASI APLIKASI
 # ==========================================
-st.set_page_config(page_title="Peach of Cake CS", page_icon="🍑", layout="centered")
+st.set_page_config(page_title="Peach of Cake CS", page_icon="ðŸ‘", layout="centered")
 
-# Menggunakan Streamlit Secrets untuk API Key
+# Inisialisasi API Key dari Streamlit Secrets
 if "OPENAI_API_KEY" in st.secrets:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 else:
-    st.error("⚠️ OPENAI_API_KEY tidak ditemukan di Streamlit Secrets.")
+    st.error("âš ï¸ OPENAI_API_KEY tidak ditemukan di Streamlit Secrets.")
     st.stop()
 
 # ==========================================
@@ -27,44 +25,38 @@ else:
 # ==========================================
 @st.cache_resource(show_spinner="Memuat basis pengetahuan toko...")
 def init_vectorstore(pdf_file_path):
+    loader = PyPDFLoader(pdf_file_path)
+    documents = loader.load()
+    
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=500, 
+        chunk_overlap=50
+    )
+    chunks = text_splitter.split_documents(documents)
+    
+    embeddings = OpenAIEmbeddings()
+    vectorstore = FAISS.from_documents(chunks, embeddings)
     return vectorstore
-
-def init_chatbot(vectorstore):
-    llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.2)
-    memory = ConversationBufferMemory(
-        memory_key="chat_history", 
-        return_messages=True
-    )
-    qa_chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
-        retriever=vectorstore.as_retriever(search_kwargs={"k": 3}),
-        memory=memory
-    )
-    return qa_chain
 
 # ==========================================
 # ANTARMUKA PENGGUNA (UI) STREAMLIT
 # ==========================================
-st.title("🍑 Peach of Cake CS 🍰")
+st.title("ðŸ‘ Peach of Cake CS ðŸ°")
 st.markdown("Selamat datang di Layanan Pelanggan kami! Silakan unggah katalog/menu PDF Anda di *sidebar*, lalu mulai mengobrol dengan bot kami.")
 
-# Sidebar untuk upload PDF
 with st.sidebar:
-    st.header("⚙️ Pengaturan Toko")
+    st.header("âš™ï¸ Pengaturan Toko")
     uploaded_file = st.file_uploader("Unggah Katalog PDF (Menu/FAQ)", type="pdf")
     
     if st.button("Hapus Riwayat Obrolan"):
         st.session_state.messages = []
-        if 'chatbot' in st.session_state:
-            del st.session_state['chatbot']
         st.rerun()
 
-# Memeriksa apakah file sudah diunggah
 if uploaded_file is None:
-    st.info("👈 Silakan unggah file PDF katalog pada menu sebelah kiri terlebih dahulu untuk memulai.")
+    st.info("ðŸ‘ˆ Silakan unggah file PDF katalog pada menu sebelah kiri terlebih dahulu untuk memulai.")
     st.stop()
 
-# Memproses file yang diunggah
+# Memproses PDF
 if "vectorstore" not in st.session_state or st.session_state.get('uploaded_file_name') != uploaded_file.name:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
         tmp_file.write(uploaded_file.getvalue())
@@ -75,33 +67,55 @@ if "vectorstore" not in st.session_state or st.session_state.get('uploaded_file_
         st.session_state.uploaded_file_name = uploaded_file.name
         os.remove(tmp_path)
 
-# Inisialisasi state untuk chatbot dan riwayat pesan
-if "chatbot" not in st.session_state:
-    st.session_state.chatbot = init_chatbot(st.session_state.vectorstore)
-
+# Inisialisasi riwayat pesan
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "Halo! Saya CS dari Peach of Cake. Ada yang bisa saya bantu terkait menu atau pesanan Anda hari ini?"}
     ]
 
-# Menampilkan riwayat obrolan
+# Tampilkan riwayat
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Input obrolan dari pengguna
+# Tangkap input pengguna
 if prompt := st.chat_input("Tanyakan sesuatu tentang kue atau layanan kami..."):
+    # Simpan dan tampilkan pesan pengguna
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("Sedang mengetik..."):
+        with st.spinner("Mencari jawaban..."):
             try:
-                response = st.session_state.chatbot({"question": prompt})
-                answer = response['answer']
+                # 1. Ambil dokumen yang relevan dari Vector Store
+                docs = st.session_state.vectorstore.similarity_search(prompt, k=3)
+                context_text = "\n\n".join([doc.page_content for doc in docs])
+                
+                # 2. Susun System Prompt dengan konteks dari PDF
+                system_prompt = (
+                    "Anda adalah Customer Service yang ramah dari toko kue 'Peach of Cake'. "
+                    "Gunakan informasi berikut dari katalog toko untuk menjawab pertanyaan pelanggan. "
+                    "Jika informasi yang ditanyakan tidak ada di dalam konteks ini, sampaikan dengan sopan bahwa Anda tidak mengetahuinya.\n\n"
+                    f"INFORMASI KATALOG:\n{context_text}"
+                )
+                
+                # 3. Bangun payload pesan untuk OpenAI (termasuk riwayat obrolan agar bot ingat konteks)
+                api_messages = [{"role": "system", "content": system_prompt}]
+                # Hanya masukkan 6 pesan terakhir agar hemat token API
+                for msg in st.session_state.messages[-6:]:
+                    api_messages.append({"role": msg["role"], "content": msg["content"]})
+                    
+                # 4. Panggil OpenAI Chat Completions API secara langsung
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=api_messages,
+                    temperature=0.2
+                )
+                
+                answer = response.choices[0].message.content
                 st.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
+                
             except Exception as e:
-                error_msg = f"Maaf, terjadi kesalahan saat memproses permintaan Anda: {e}"
-                st.error(error_msg)
+                st.error(f"Maaf, terjadi kesalahan sistem: {e}")
