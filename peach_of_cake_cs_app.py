@@ -11,7 +11,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 # ==========================================
 # KONFIGURASI APLIKASI
 # ==========================================
-st.set_page_config(page_title="Peach of Cake CS", page_icon="ðŸ‘", layout="centered")
+st.set_page_config(page_title="Peach of Cake CS", page_icon="🍑", layout="centered")
 
 # Inisialisasi API Key dari Streamlit Secrets
 if "OPENAI_API_KEY" in st.secrets:
