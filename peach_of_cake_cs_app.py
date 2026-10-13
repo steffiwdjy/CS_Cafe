@@ -4,6 +4,7 @@ import tempfile
 from openai import OpenAI
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
+# Kita kembali menggunakan Embeddings asli dari LangChain (untuk Gemini)
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -42,8 +43,8 @@ def init_vectorstore(pdf_file_path):
     )
     chunks = text_splitter.split_documents(documents)
     
-    # PERBAIKAN FINAL: Gunakan model embedding-001 yang paling stabil dan pasti didukung oleh Langchain v1beta
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    # PERBAIKAN: Gunakan text-embedding-004
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
     
     vectorstore = FAISS.from_documents(chunks, embeddings)
     return vectorstore
