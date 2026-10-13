@@ -5,7 +5,6 @@ from openai import OpenAI
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import OpenAIEmbeddings
-# Menggunakan modul yang tepat untuk RecursiveCharacterTextSplitter pada versi Langchain terbaru
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # ==========================================
@@ -15,10 +14,15 @@ st.set_page_config(page_title="Peach of Cake CS", page_icon="🍑", layout="cent
 
 # Inisialisasi API Key dari Streamlit Secrets
 if "OPENAI_API_KEY" in st.secrets:
-    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
-    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    api_key = st.secrets["OPENAI_API_KEY"]
+    os.environ["OPENAI_API_KEY"] = api_key
+    # Menggunakan base URL Gemini API agar gratis
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+    )
 else:
-    st.error("âš ï¸ OPENAI_API_KEY tidak ditemukan di Streamlit Secrets.")
+    st.error("⚠️ OPENAI_API_KEY (Gemini API Key) tidak ditemukan di Streamlit Secrets.")
     st.stop()
 
 # ==========================================
@@ -35,18 +39,24 @@ def init_vectorstore(pdf_file_path):
     )
     chunks = text_splitter.split_documents(documents)
     
-    embeddings = OpenAIEmbeddings()
+    # PENTING: Embeddings juga dialihkan ke Gemini (model text-embedding-004)
+    embeddings = OpenAIEmbeddings(
+        model="text-embedding-004",
+        openai_api_base="https://generativelanguage.googleapis.com/v1beta/openai/",
+        openai_api_key=api_key
+    )
+    
     vectorstore = FAISS.from_documents(chunks, embeddings)
     return vectorstore
 
 # ==========================================
 # ANTARMUKA PENGGUNA (UI) STREAMLIT
 # ==========================================
-st.title ("Peach of Cake CS")
+st.title("🍑 Peach of Cake CS 🍰")
 st.markdown("Selamat datang di Layanan Pelanggan kami! Silakan unggah katalog/menu PDF Anda di *sidebar*, lalu mulai mengobrol dengan bot kami.")
 
 with st.sidebar:
-    st.header("Pengaturan Toko")
+    st.header("⚙️ Pengaturan Toko")
     uploaded_file = st.file_uploader("Unggah Katalog PDF (Menu/FAQ)", type="pdf")
     
     if st.button("Hapus Riwayat Obrolan"):
@@ -54,7 +64,7 @@ with st.sidebar:
         st.rerun()
 
 if uploaded_file is None:
-    st.info("Silakan unggah file PDF katalog pada menu sebelah kiri terlebih dahulu untuk memulai.")
+    st.info("👈 Silakan unggah file PDF katalog pada menu sebelah kiri terlebih dahulu untuk memulai.")
     st.stop()
 
 # Memproses PDF
@@ -101,14 +111,14 @@ if prompt := st.chat_input("Tanyakan sesuatu tentang kue atau layanan kami..."):
                     f"INFORMASI KATALOG:\n{context_text}"
                 )
                 
-                # 3. Bangun payload pesan untuk OpenAI
+                # 3. Bangun payload pesan untuk OpenAI (Gemini)
                 api_messages = [{"role": "system", "content": system_prompt}]
                 for msg in st.session_state.messages[-6:]:
                     api_messages.append({"role": msg["role"], "content": msg["content"]})
                     
-                # 4. Panggil OpenAI Chat Completions API
+                # 4. Panggil API menggunakan model Gemini yang gratis
                 response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
+                    model="gemini-2.5-flash",
                     messages=api_messages,
                     temperature=0.2
                 )
