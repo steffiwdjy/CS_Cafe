@@ -42,11 +42,11 @@ def init_vectorstore(pdf_file_path):
 # ==========================================
 # ANTARMUKA PENGGUNA (UI) STREAMLIT
 # ==========================================
-st.title("ðŸ‘ Peach of Cake CS ðŸ°")
+st.title ("Peach of Cake CS")
 st.markdown("Selamat datang di Layanan Pelanggan kami! Silakan unggah katalog/menu PDF Anda di *sidebar*, lalu mulai mengobrol dengan bot kami.")
 
 with st.sidebar:
-    st.header("âš™ï¸ Pengaturan Toko")
+    st.header("Pengaturan Toko")
     uploaded_file = st.file_uploader("Unggah Katalog PDF (Menu/FAQ)", type="pdf")
     
     if st.button("Hapus Riwayat Obrolan"):
@@ -54,7 +54,7 @@ with st.sidebar:
         st.rerun()
 
 if uploaded_file is None:
-    st.info("ðŸ‘ˆ Silakan unggah file PDF katalog pada menu sebelah kiri terlebih dahulu untuk memulai.")
+    st.info("Silakan unggah file PDF katalog pada menu sebelah kiri terlebih dahulu untuk memulai.")
     st.stop()
 
 # Memproses PDF
