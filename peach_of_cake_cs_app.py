@@ -42,8 +42,8 @@ def init_vectorstore(pdf_file_path):
     )
     chunks = text_splitter.split_documents(documents)
     
-    # PERBAIKAN: Gunakan text-embedding-004 tanpa prefix 'models/'
-    embeddings = GoogleGenerativeAIEmbeddings(model="text-embedding-004")
+    # PERBAIKAN FINAL: Gunakan model embedding-001 yang paling stabil dan pasti didukung oleh Langchain v1beta
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     
     vectorstore = FAISS.from_documents(chunks, embeddings)
     return vectorstore
