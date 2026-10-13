@@ -4,8 +4,8 @@ import tempfile
 from openai import OpenAI
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
-# Kita kembali menggunakan Embeddings asli dari LangChain (untuk Gemini)
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+# Menggunakan HuggingFace untuk Embeddings (Lokal & 100% Gratis)
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # ==========================================
@@ -17,8 +17,6 @@ st.set_page_config(page_title="Peach of Cake CS", page_icon="ðŸ‘", layout=
 if "OPENAI_API_KEY" in st.secrets:
     api_key = st.secrets["OPENAI_API_KEY"]
     os.environ["OPENAI_API_KEY"] = api_key
-    # Karena Langchain Google menggunakan variabel lingkungan spesifik
-    os.environ["GOOGLE_API_KEY"] = api_key
     
     # Klien OpenAI khusus untuk text generation (memanggil Gemini)
     client = OpenAI(
@@ -43,8 +41,9 @@ def init_vectorstore(pdf_file_path):
     )
     chunks = text_splitter.split_documents(documents)
     
-    # PERBAIKAN: Gunakan text-embedding-004
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    # PERBAIKAN FINAL & PERMANEN: Menggunakan HuggingFace Embeddings (Gratis & Berjalan Lokal)
+    # Ini akan mencegah semua error 404/500 dari API Google/OpenAI saat memproses PDF
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     
     vectorstore = FAISS.from_documents(chunks, embeddings)
     return vectorstore
