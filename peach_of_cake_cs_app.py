@@ -5,7 +5,8 @@ from openai import OpenAI
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import OpenAIEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+# Menggunakan modul yang tepat untuk RecursiveCharacterTextSplitter pada versi Langchain terbaru
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # ==========================================
 # KONFIGURASI APLIKASI
@@ -100,13 +101,12 @@ if prompt := st.chat_input("Tanyakan sesuatu tentang kue atau layanan kami..."):
                     f"INFORMASI KATALOG:\n{context_text}"
                 )
                 
-                # 3. Bangun payload pesan untuk OpenAI (termasuk riwayat obrolan agar bot ingat konteks)
+                # 3. Bangun payload pesan untuk OpenAI
                 api_messages = [{"role": "system", "content": system_prompt}]
-                # Hanya masukkan 6 pesan terakhir agar hemat token API
                 for msg in st.session_state.messages[-6:]:
                     api_messages.append({"role": msg["role"], "content": msg["content"]})
                     
-                # 4. Panggil OpenAI Chat Completions API secara langsung
+                # 4. Panggil OpenAI Chat Completions API
                 response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=api_messages,
