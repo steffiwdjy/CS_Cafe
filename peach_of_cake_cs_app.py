@@ -4,25 +4,29 @@ import tempfile
 from openai import OpenAI
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import OpenAIEmbeddings
+# Kita kembali menggunakan Embeddings asli dari LangChain (untuk Gemini)
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # ==========================================
 # KONFIGURASI APLIKASI
 # ==========================================
-st.set_page_config(page_title="Peach of Cake CS", page_icon="🍑", layout="centered")
+st.set_page_config(page_title="Peach of Cake CS", page_icon="ðŸ‘", layout="centered")
 
 # Inisialisasi API Key dari Streamlit Secrets
 if "OPENAI_API_KEY" in st.secrets:
     api_key = st.secrets["OPENAI_API_KEY"]
     os.environ["OPENAI_API_KEY"] = api_key
-    # Menggunakan base URL Gemini API agar gratis
+    # Karena Langchain Google menggunakan variabel lingkungan spesifik
+    os.environ["GOOGLE_API_KEY"] = api_key
+    
+    # Klien OpenAI khusus untuk text generation (memanggil Gemini)
     client = OpenAI(
         api_key=api_key,
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
     )
 else:
-    st.error("⚠️ OPENAI_API_KEY (Gemini API Key) tidak ditemukan di Streamlit Secrets.")
+    st.error("âš ï¸ OPENAI_API_KEY (Gemini API Key) tidak ditemukan di Streamlit Secrets.")
     st.stop()
 
 # ==========================================
@@ -39,12 +43,8 @@ def init_vectorstore(pdf_file_path):
     )
     chunks = text_splitter.split_documents(documents)
     
-    # PENTING: Embeddings juga dialihkan ke Gemini (model text-embedding-004)
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-004",
-        openai_api_base="https://generativelanguage.googleapis.com/v1beta/openai/",
-        openai_api_key=api_key
-    )
+    # PERBAIKAN: Gunakan GoogleGenerativeAIEmbeddings asli dari LangChain
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
     
     vectorstore = FAISS.from_documents(chunks, embeddings)
     return vectorstore
@@ -52,11 +52,11 @@ def init_vectorstore(pdf_file_path):
 # ==========================================
 # ANTARMUKA PENGGUNA (UI) STREAMLIT
 # ==========================================
-st.title("🍑 Peach of Cake CS 🍰")
+st.title("ðŸ‘ Peach of Cake CS ðŸ°")
 st.markdown("Selamat datang di Layanan Pelanggan kami! Silakan unggah katalog/menu PDF Anda di *sidebar*, lalu mulai mengobrol dengan bot kami.")
 
 with st.sidebar:
-    st.header("⚙️ Pengaturan Toko")
+    st.header("âš™ï¸ Pengaturan Toko")
     uploaded_file = st.file_uploader("Unggah Katalog PDF (Menu/FAQ)", type="pdf")
     
     if st.button("Hapus Riwayat Obrolan"):
@@ -64,7 +64,7 @@ with st.sidebar:
         st.rerun()
 
 if uploaded_file is None:
-    st.info("👈 Silakan unggah file PDF katalog pada menu sebelah kiri terlebih dahulu untuk memulai.")
+    st.info("ðŸ‘ˆ Silakan unggah file PDF katalog pada menu sebelah kiri terlebih dahulu untuk memulai.")
     st.stop()
 
 # Memproses PDF
@@ -74,9 +74,14 @@ if "vectorstore" not in st.session_state or st.session_state.get('uploaded_file_
         tmp_path = tmp_file.name
 
     with st.spinner("Memproses katalog Anda..."):
-        st.session_state.vectorstore = init_vectorstore(tmp_path)
-        st.session_state.uploaded_file_name = uploaded_file.name
-        os.remove(tmp_path)
+        try:
+            st.session_state.vectorstore = init_vectorstore(tmp_path)
+            st.session_state.uploaded_file_name = uploaded_file.name
+        except Exception as e:
+            st.error(f"Gagal memproses PDF: {e}")
+            st.stop()
+        finally:
+            os.remove(tmp_path)
 
 # Inisialisasi riwayat pesan
 if "messages" not in st.session_state:
